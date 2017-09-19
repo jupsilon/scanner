@@ -1,4 +1,4 @@
-#!/usr/local/bin/sbcl --script
+;#!/usr/local/bin/sbcl --script
 
 (load "~/.sbclrc")
 
@@ -28,48 +28,59 @@
 	      :test #'string=)))
 
 (defun resolve-comments (node)
-  (let (members
+  (let (rest
 	summary
 	text)
     (let ((desc (caddr node)))
       (if (string= (car desc) "description")
 	  (progn
-	    (setf summary (attribute (cadr  desc) "summary"))
-	    (setf text               (caddr desc))
-	    (setf members (cdddr node)))
+	    (setf summary (attribute (cadr desc) "summary"))
+	    (setf text    (caddr desc))
+	    (setf rest    (cdddr node)))
 	  (progn
-	    (setf members desc)))
-      (values members summary text))))
+	    (setf rest (cddr node))))
+      (values rest summary text))))
 
 (defun trim-note (note)
   (remove-if (lambda (line) (string= line ""))
 	     (mapcar (lambda (line) (ppcre:regex-replace "^\\s+" line ""))
 		     (ppcre:split "\\n" note))))
 
+(defun wire-type (type)
+  (cond ((string= type "int")    "int32_t")
+	((string= type "uint")   "uint32_t")
+	((string= type "fixed")  "wl_fixed_t")
+	((string= type "string") "char const*")
+	((string= type "array")  "wl_array")
+	((string= type "fd")     "int32_t")
+	(t (error "unknown type ~a" type))))
+
 (defun emit-formal-parameters (args)
   (if (null args) "(void) -> void"
-      (with-output-to-string (stream)
-	(let ((retn "void"))
-	  (princ "(" stream)
-	  (dolist (arg args)
-	    (unless (string= (car arg) "arg") (error "missing arg"))
-	    (let ((type (attribute (cadr arg) "type"))
-		  (name (attribute (cadr arg) "name")))
-	      (if (string= type "new_id") (setf retn (concat (attribute (cadr arg) "interface") "_t"))
-		  (progn
-		    (when (string= type "object") (setf type (concat (attribute (cadr arg) "interface") "_t")))
-		    (princ type stream)
-		    (princ " " stream)
-		    (princ name stream)
-		    (princ ", " stream)))))
-	  (princ #\backspace stream)
-	  (princ #\backspace stream)
-	  (princ ") -> " stream)
-	  (princ retn stream)))))
+      (progn
+	(unless (string= (caar args) "arg") (error "missing arg"))
+	(let ((retn (find-if   (lambda (arg) (string= (attribute (cadr arg) "type") "new_id")) args))
+	      (prms (remove-if (lambda (arg) (string= (attribute (cadr arg) "type") "new_id")) args)))
+	  (if (null retn)
+	      (setf retn "void")
+	      (let ((interface-name (attribute (cadr retn) "interface")))
+		(if (null interface-name)
+		    (setf retn "void*")
+		    (setf retn (concat (attribute (cadr retn) "interface") "_t")))))
+	  (if (null prms)
+	      (setf prms "(void)")
+	      (progn
+		(setf prms (mapcar (lambda (arg) (if (string= (attribute (cadr arg) "type") "object")
+						     (concat  (attribute (cadr arg) "interface") "* "
+							      (attribute (cadr arg) "name"))
+						     (concat  (wire-type (attribute (cadr arg) "type")) " "
+							      (attribute (cadr arg) "name"))))
+				   prms))
+		(setf prms (format nil "(~{~a~^, ~})" prms))))
+	  (concat prms " -> " retn)))))
 
 (defun emit-client-request-decl (member)
-  (let ((name (attribute (cadr member) "name"))
-	(type (attribute (cadr member) "type")))
+  (let ((name (attribute (cadr member) "name")))
     (multiple-value-bind (args brief note) (resolve-comments member)
       (when (not (null brief))
 	(<< "    /// @brief " brief))
@@ -137,5 +148,7 @@
 	(interfaces (cddr root)))
     (emit-client-include-guard interfaces protocol-name)))
 
-(let ((root (preprocess (cxml:parse *standard-input* (cxml-xmls:make-xmls-builder)))))
+;(let ((root (preprocess (cxml:parse      *standard-input*           (cxml-xmls:make-xmls-builder)))))
+;(let ((root (preprocess (cxml:parse-file "weston-desktop-shell.xml" (cxml-xmls:make-xmls-builder)))))
+(let ((root (preprocess (cxml:parse-file "wayland.xml"              (cxml-xmls:make-xmls-builder)))))
   (emit-root root))
