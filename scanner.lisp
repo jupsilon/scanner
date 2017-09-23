@@ -179,7 +179,7 @@
     (emit-client-namespace interfaces protocol-name)
     (<< "#endif/*INCLUDE_" cap-name "_CLIENT_H_*/")))
 
-(defun emit (node)
+(defun emit-client (node)
   (let ((protocol-name (node-get-value node "name"))
 	(nodes (node-get-nodes node)))
     (let ((copyright (nodes-select nodes "copyright"))
@@ -187,8 +187,6 @@
       (emit-client-include-guard interface protocol-name)
       (print copyright))))
 
-;(emit (preprocess (cxml:parse      *standard-input*           (cxml-xmls:make-xmls-builder))))
-;(emit (preprocess (cxml:parse-file "weston-desktop-shell.xml" (cxml-xmls:make-xmls-builder))))
-(emit (preprocess (cxml:parse-file "wayland.xml"              (cxml-xmls:make-xmls-builder))))
-
-
+;(emit-client (preprocess (cxml:parse      *standard-input*           (cxml-xmls:make-xmls-builder))))
+;(emit-client (preprocess (cxml:parse-file "weston-desktop-shell.xml" (cxml-xmls:make-xmls-builder))))
+(emit-client (preprocess (cxml:parse-file "wayland.xml"              (cxml-xmls:make-xmls-builder))))
