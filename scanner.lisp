@@ -136,6 +136,18 @@
 		(setf prms (format nil "(~{~a~^, ~})" prms))))
 	  (concat prms " -> " retn)))))
 
+(defun emit-formal-parameters-list (params)
+  (if (null params)
+      "()"
+      (format nil
+	      "(~{~a~^, ~})"
+	      (mapcar (lambda (param) (concat (elt param 0) " " (elt param 1))) params))))
+
+(defun emit-result-type (result)
+  (if (null result)
+      "void"
+      (elt result 0)))
+
 (defun args-get-params (args)
   (mapcar (lambda (arg)
 	    (let* ((attributes (node-get-attributes arg))
@@ -184,12 +196,13 @@
 	  (<<     "/// @return  " result-type                   )
 	  (when (not (null result-summary))
 	    (<<   "/// @retval  " result-summary                ))))
-      (when (not (null type))
-	(<<       "/// @remarks " (string-upcase type)          ))
+      (when (and (not (null type)) (string= type "destructor"))
+	(<<       "/// @remarks the server destructor"       ))
       (emit-lines notes
 		  "/// @note    "
 		  "///          ")
-      (<<         "auto " name (emit-formal-parameters args) ";"))))
+            (<<         (emit-result-type result) " " name (emit-formal-parameters-list params) ";"))))
+;      (<<         (emit-result-type result) " " name (emit-formal-parameters args) ";"))))
 
 (defun emit-client-interface-members (interface-members)
   (let ((requests (nodes-select interface-members "request")))
