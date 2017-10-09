@@ -71,11 +71,11 @@
   (remove-if     (lambda (node) (string= (node-get-label node) label)) nodes))
 
 (defun preprocess (protocol)
-	   (remove-if (lambda (item) (if (stringp item) (not (null (ppcre:scan "^\\s+$" item)))))
-		      (mapcar (lambda (item)
-				(cond ((listp item) (preprocess item))
-				      (t item)))
-			      protocol)))
+  (remove-if (lambda (item) (if (stringp item) (not (null (ppcre:scan "^\\s+$" item)))))
+	     (mapcar (lambda (item)
+		       (cond ((listp item) (preprocess item))
+			     (t item)))
+		     protocol)))
 
 (defun trim-lines (lines)
   (remove-if (lambda (line) (string= line ""))
@@ -389,10 +389,19 @@
 	  "~{~a~^~%~}"
 	  (mapcar (lambda (interface) (s/<< (emit-client-interface interface))) interfaces)))
 
+;(defun emit-client-listeners (interfaces)
+;  (let ((interfaces-with-listener (find-if (lambda (interface) (node-get-nodes interface)
+
 (defun emit-client-interfaces-decl (interfaces)
   (indent/<<
     (dolist (interface interfaces)
-      (<< "class " (node-get-value interface "name") ";"))))
+      (<< "class " (node-get-value interface "name") "_t;"))))
+
+(defun emit-client-listeners-decl (interfaces)
+  (indent/<<
+    (dolist (interface interfaces)
+      (when (not (null (nodes-select (node-get-nodes interface) "event")))
+	(<< "class " (node-get-value interface "name") "_listener_t;")))))
 
 (defun emit-client-interfaces-impl (interfaces)
   (format (current-output)
@@ -424,8 +433,10 @@
       (<<         "{")
       (when (not (null interfaces))
 	(emit-client-interfaces-decl interfaces)
+	(emit-client-listeners-decl interfaces)
 	(<<)
 	(emit-client-interfaces interfaces)
+	;(emit-client-listeners interfaces)
 	(<<)
 	(emit-client-interfaces-impl interfaces))
       (<<         "} // namespace wayland_client_wrappers")
@@ -437,5 +448,5 @@
 (set-indent-unit "    ")
 ;(emit-client (preprocess (cxml:parse-file "weston-desktop-shell.xml"         (cxml-xmls:make-xmls-builder))))
 ;(emit-client (preprocess (cxml:parse-file "wayland.xml"                      (cxml-xmls:make-xmls-builder))))
-(emit-client (preprocess (cxml:parse-file "relative-pointer-unstable-v1.xml" (cxml-xmls:make-xmls-builder))))
-;(emit-client (preprocess (cxml:parse-file "xdg-foreign-unstable-v1.xml"      (cxml-xmls:make-xmls-builder))))
+;(emit-client (preprocess (cxml:parse-file "relative-pointer-unstable-v1.xml" (cxml-xmls:make-xmls-builder))))
+(emit-client (preprocess (cxml:parse-file "xdg-foreign-unstable-v1.xml"      (cxml-xmls:make-xmls-builder))))
