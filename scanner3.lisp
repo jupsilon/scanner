@@ -142,7 +142,7 @@
 		 (<<     "/// @brief " description-summary)
 		 (==     "/// @note  " lines
 		         "///        "))
-	       (<<       "class " class " : public " base-class " {")
+	       (<<       "class " class-identifier " : public " base-class " {")
 	       (<<       "public:")
 	       (indent/<<
 		 (<<       "using base_type = " base-class ";")
@@ -152,7 +152,7 @@
 	       (indent/<<
 		 (<<       "/// @constructor")
 		 (<<       "/// @param src source raw pointer")
-		 (<<        class "(c_struct_type const* src)")
+		 (<<        class-identifier "(c_struct_type const* src)")
 		 (<<       "  : base_type(src)")
 		 (<<       "{")
 		 (<<       "}"))
