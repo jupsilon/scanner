@@ -32,7 +32,7 @@
   `(symbol-macrolet-prefixed (,node-label
 			      (node ,node)
 			      (attributes (nth 1 ,node))
-			      (string-values (node-string-lines (caddr ,node)))
+			      (string-value (node-string-value (caddr ,node)))
 			      (children (cddr ,node))
 			      ,@(mapcar (lambda (attribute-specifier)
 					  (list attribute-specifier
@@ -47,9 +47,77 @@
 	      ,@body))
 	   (remove-if-not (lambda (node) (string-equal (string ',node-label) (car node))) ,node-list)))
 
+(let ((indent-unit "  ")
+      (indent-level 0))
+  (defun << (&rest args)
+    (if (null args)
+	(terpri)
+	(progn
+	  (loop repeat indent-level do (princ indent-unit))
+	  (dolist (item args)
+	    (princ item))
+	  (terpri))))
+  (defun set-indent-unit (new-value)
+    (setf indent-unit new-value))
+  (defun do-indent ()
+    (incf indent-level))
+  (defun do-unindent ()
+    (decf indent-level)))
+
+(defmacro indent (&body body)
+  `(unwind-protect
+	(progn
+	  (do-indent)
+	  ,@body)
+     (do-unindent)))
+
+(defun == (header-first lines header-rest)
+  (<< header-first (car lines))
+  (dolist (line (cdr lines))
+    (<< header-rest line)))
+
+(defun concat (&rest args)
+  (apply #'concatenate (cons 'string args)))
+
+(defun node-string-value (multiline-str)
+  (remove-if (lambda (line) (string= line ""))
+	     (mapcar (lambda (line) (ppcre:regex-replace "^\\s+" line ""))
+		     (ppcre:split "\\n" multiline-str))))
+
+(defparameter +header-ext+ "hpp")
+(defparameter +namespace-identifier+ "wayland_client")
+(defun include-guard-identifier (protocol-name)
+  (string-upcase (concat "INCLUDE_" protocol-name "_CLIENT_" +header-ext+ "_")))
+(defun interface-identifier (interface-name)
+  (concat interface-name "_t"))
+(defun base-identifier (node)
+  (node-let (node interface (name version))
+    (concat "wayland_client_impl<" (interface-identifier interface-name) ", " interface-version ">")))
+
+(defun emit-output-tree (path &aux (input-tree (build-input-tree path)))
+  (node-let-map (input-tree protocol (name))
+    (<<             "/// @file      " (car (cl-ppcre:split "\\." path)) "." +header-ext+)
+    (node-let-map (protocol-children description (summary))
+      (<<           "/// @brief     " description-summary))
+    (node-let-map (protocol-children copyright ())
+      (==           "/// @copyright " copyright-string-value
+		    "///            "))
+    (node-let-map (protocol-children description ())
+      (==           "/// @note      " description-string-value
+		    "///            "))
+    (<<)
+    (<<             "#ifndef " (include-guard-identifier protocol-name))
+    (<<             "#define " (include-guard-identifier protocol-name))
+    (<<)
+    (<<             "namespace " +namespace-identifier+)
+    (<<             "{")
+    (node-let-map (protocol-children interface (name))
+      (indent
+	(<<           "class " (interface-identifier interface-name) ";")))
+    (<<             "}")
+    (<<)
+    (<<             "#endif/*" (include-guard-identifier protocol-name)  "*/")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(let ((root (build-input-tree "wayland.xml")))
-  (print (node-let-map (root protocol (name))
-	   (node-let-map (protocol-children interface (name))
-	     interface-name))))
+(print (emit-output-tree "xdg-foreign-unstable-v1.xml"))
